@@ -12,3 +12,9 @@ Allow: /
 
 User-agent: *
 Allow: /
+
+User-agent: *
+Disallow: /studio
+Disallow: /login
+
+Sitemap: https://loopgramchannel.com/sitemap.xml

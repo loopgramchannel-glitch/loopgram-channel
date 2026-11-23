@@ -15,4 +15,9 @@ export default defineConfig({
     // nitro/vite builds from this
     server: { entry: "server" },
   },
+  vite: {
+    // Unique per build: the edge cache keys pages by it so a new deploy never serves old HTML
+    // that points at page files the deploy removed.
+    define: { __BUILD_ID__: JSON.stringify(Date.now().toString(36)) },
+  },
 });
