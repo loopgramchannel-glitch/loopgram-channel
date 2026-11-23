@@ -6,6 +6,7 @@ import { PhotoWall, SectionHead, TopTen, TopTenSkeleton, TopicTiles, type Topic 
 import { pickTopTen } from "@/lib/discover";
 import { useShowcase } from "@/hooks/useShowcase";
 import { hourSeed, mixFeed } from "@/lib/feed-mix";
+import { asPostList } from "@/lib/safe-data";
 import { postsQuery } from "@/lib/posts-query";
 import { AdSlot } from "@/components/AdSlot";
 
@@ -29,7 +30,7 @@ export const Route = createFileRoute("/explore")({
 const ICONS: Record<string, typeof Flame> = { music: Music2, gaming: Gamepad2, news: Newspaper, movies: Film, podcasts: Mic, sports: Trophy };
 
 function Explore() {
-  const { data } = useSuspenseQuery(postsQuery);
+  const data = asPostList(useSuspenseQuery(postsQuery).data);
   const show = useShowcase();
   const cats = [...new Set(data.map((p) => p.category).filter(Boolean))];
   // A different hourly shuffle than Home, so Explore never mirrors the Home feed.

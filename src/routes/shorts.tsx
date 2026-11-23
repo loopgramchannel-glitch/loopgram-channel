@@ -4,6 +4,7 @@ import { Clapperboard } from "lucide-react";
 import { Page } from "@/components/lg";
 import { postIsShort, useRatios } from "@/components/PostView";
 import { ShortTile, ShortsMark } from "@/components/Shorts";
+import { asPostList } from "@/lib/safe-data";
 import { postsQuery } from "@/lib/posts-query";
 import { hourSeed, mixFeed } from "@/lib/feed-mix";
 
@@ -25,7 +26,7 @@ export const Route = createFileRoute("/shorts")({
 });
 
 function ShortsPage() {
-  const { data } = useSuspenseQuery(postsQuery);
+  const data = asPostList(useSuspenseQuery(postsQuery).data);
   const ratios = useRatios(data.map((p) => p.videoUrl));
   const shorts = mixFeed(data, hourSeed()).filter((p) => postIsShort(p, ratios));
   if (!shorts.length) {

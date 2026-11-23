@@ -7,6 +7,7 @@ import { useSuspenseInfiniteQuery } from "@tanstack/react-query";
 import { ContinueWatching } from "@/components/ContinueWatching";
 import { siteJsonLd } from "@/lib/seo";
 import { AdvertiseBox } from "@/components/AdvertiseBox";
+import { feedPosts } from "@/lib/safe-data";
 
 export const Route = createFileRoute("/")({
   validateSearch: z.object({ c: z.string().max(40).optional() }),
@@ -30,7 +31,7 @@ export const Route = createFileRoute("/")({
 
 function Home() {
   const { c } = Route.useSearch();
-  const data = useSuspenseInfiniteQuery(feedQuery(c)).data.pages.flatMap((p) => p.posts);
+  const data = feedPosts(useSuspenseInfiniteQuery(feedQuery(c)).data);
   return (
     <Page>
       <h1 className="sr-only">LoopgramChannel videos</h1>

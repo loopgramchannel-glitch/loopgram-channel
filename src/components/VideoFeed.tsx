@@ -14,6 +14,7 @@ import { useReveal } from "@/lib/infinite";
 import { FeaturedHero, FeaturedHeroSkeleton, SectionHead, ShortsReel } from "@/components/Discover";
 import { pickHero } from "@/lib/discover";
 import { useShowcase } from "@/hooks/useShowcase";
+import { feedPosts } from "@/lib/safe-data";
 
 export function VideoGrid({ list, views }: { list: PostT[]; views: Record<string, { views?: number } | undefined> }) {
   const { settings } = useAuth();
@@ -40,7 +41,7 @@ export function VideoFeed({ c, children, footer }: { c?: string | undefined; chi
   const feed = useSuspenseInfiniteQuery(feedQuery(c));
   const show = useShowcase();
   // Already mixed on the server; pages are joined in order.
-  const data = feed.data.pages.flatMap((p) => p.posts);
+  const data = feedPosts(feed.data);
   const more = useRef<HTMLDivElement>(null);
   const { hasNextPage, isFetchingNextPage, fetchNextPage } = feed;
   useEffect(() => {

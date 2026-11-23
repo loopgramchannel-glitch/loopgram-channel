@@ -9,6 +9,7 @@ import { parseVideoSource } from "@/lib/video-source";
 import { AdSlot } from "@/components/AdSlot";
 import { PostTile } from "@/components/PostTile";
 import { LinkedText } from "@/components/LinkedText";
+import { asPostList } from "@/lib/safe-data";
 import { postQuery, postsQuery, timeAgo } from "@/lib/posts-query";
 import { nextUp, postShareMeta, shareUrlAt } from "@/lib/growth";
 import { playerTime } from "@/lib/watch-history";
@@ -45,7 +46,7 @@ export const Route = createFileRoute("/post/$id")({
 
 function PostWatch() {
   const { id } = Route.useParams();
-  const { data } = useSuspenseQuery(postsQuery);
+  const data = asPostList(useSuspenseQuery(postsQuery).data);
   // Authoritative check: the post comes from its own database row, not the cached list.
   const { data: post } = useSuspenseQuery(postQuery(id));
   const [more, setMore] = useState(false);
