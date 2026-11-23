@@ -5,6 +5,14 @@ import { z } from "zod";
 import { setResponseHeader } from "@tanstack/react-start/server";
 import { EDGE_DATA_CACHE } from "./edge-cache";
 
+/** Audit rows from KV; skips broken entries instead of failing the whole panel. */
+function parseAudit(r: unknown): any[] {
+  if (!Array.isArray(r)) return [];
+  const out: any[] = [];
+  for (const x of r) { try { const v = JSON.parse(String(x)); if (v && typeof v === "object") out.push(v); } catch { /* skip */ } }
+  return out;
+}
+
 const tok = z.object({ token: z.string().min(20).max(4096) });
 
 export const SiteSettings = z.object({
@@ -131,7 +139,7 @@ export const studioOverview = createServerFn({ method: "POST" }).inputValidator(
     idt<{ recordsCount?: string }>("accounts:query", { returnUserInfo: false }).then((r) => Number(r.recordsCount ?? 0)).catch(() => null),
     import("./queue.server").then((m) => m.queueStats()).catch(() => null),
     import("./presence").then((p) => redis(["ZCOUNT", p.PRESENCE_KEY, p.onlineCutoff(Date.now()), "+inf"])).then((n) => Number(n ?? 0)).catch(() => null),
-    redis(["LRANGE", "studio:audit", 0, 9]).then((r) => ((r as string[] | null) ?? []).map((x) => JSON.parse(x))).catch(() => []),
+    redis(["LRANGE", "studio:audit", 0, 9]).then((r) => parseAudit(r)).catch(() => []),
   ]);
   return { accounts, queue, online, audit, settings: await readSettings() };
 });
@@ -208,7 +216,7 @@ export const studioAudit = createServerFn({ method: "POST" }).inputValidator((d:
   await owner(data.token);
   const { redis } = await import("./backend.server");
   const r = (await redis(["LRANGE", "studio:audit", data.page * 50, data.page * 50 + 49])) as string[] | null;
-  return { entries: (r ?? []).map((x) => JSON.parse(x)), page: data.page };
+  return { entries: parseAudit(r), page: data.page };
 });
 
 export const studioSearch = createServerFn({ method: "POST" }).inputValidator((d: unknown) => tok.extend({ kind: z.enum(["reconcile", "retry"]) }).parse(d)).handler(async ({ data }) => {

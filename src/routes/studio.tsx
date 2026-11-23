@@ -22,6 +22,7 @@ import { SECTIONS, type SectionId } from "@/lib/studio-sections";
 import { MonetizationPanel } from "@/components/StudioMonetization";
 import { ShowcasePanel } from "@/components/StudioShowcase";
 import type { SiteSettingsT } from "@/lib/studio.functions";
+import { arr, safeSettings } from "@/lib/studio-safe";
 
 export const Route = createFileRoute("/studio")({
   ssr: false,
@@ -162,7 +163,8 @@ function Overview() {
   const q = useQuery({ queryKey: ["studio", "overview"], queryFn: () => call(studioOverview), staleTime: 30_000 });
   if (q.isPending) return <Skeleton />;
   if (q.isError) return <ErrorBox error={q.error} retry={() => q.refetch()} />;
-  const d = q.data;
+  const d: Partial<Awaited<ReturnType<typeof studioOverview>>> = q.data ?? {};
+  const st = safeSettings(d.settings);
   return (
     <div className="space-y-4">
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
@@ -170,14 +172,15 @@ function Overview() {
         <Stat label="Registered accounts" value={d.accounts ?? <Unavailable />} note="Firebase Authentication, all time" />
         <Stat label="Jobs waiting" value={d.queue ? d.queue.waiting : <Unavailable />} note="Cloudflare D1 queue" />
         <Stat label="Failed jobs" value={d.queue ? d.queue.dead : <Unavailable />} note="Dead-letter list" />
-        <Stat label="Announcement" value={d.settings.bannerOn ? "Live" : "Off"} note={d.settings.maintenance ? "Maintenance mode ON" : "Site open"} />
+        <Stat label="Announcement" value={st.bannerOn ? "Live" : "Off"} note={st.maintenance ? "Maintenance mode ON" : "Site open"} />
       </div>
-      <Card title="Recent owner actions"><AuditTable entries={d.audit} /></Card>
+      <Card title="Recent owner actions"><AuditTable entries={arr(d.audit)} /></Card>
     </div>
   );
 }
 
-function AuditTable({ entries }: { entries: any[] }) {
+function AuditTable({ entries: raw }: { entries: any[] }) {
+  const entries = arr<any>(raw).filter((e) => e && typeof e === "object");
   if (!entries.length) return <p className="text-sm text-muted-foreground">No actions recorded yet.</p>;
   return (
     <div className="overflow-x-auto"><table className="w-full text-sm">
@@ -211,14 +214,14 @@ function UsersPanel() {
         <button className="h-10 rounded-lg bg-primary px-4 text-sm font-semibold text-primary-foreground">Find</button>
         {email && <button type="button" onClick={() => { setLookup(""); setEmail(""); }} className="h-10 rounded-lg border px-3 text-sm">Clear</button>}
       </form>
-      {q.data && <p className="text-sm"><span className="mr-1 inline-block h-2 w-2 animate-pulse rounded-full bg-primary" />{q.data.onlineCount} signed-in user{q.data.onlineCount === 1 ? "" : "s"} online now</p>}
+      {q.data && <p className="text-sm"><span className="mr-1 inline-block h-2 w-2 animate-pulse rounded-full bg-primary" />{q.data.onlineCount ?? 0} signed-in user{q.data.onlineCount === 1 ? "" : "s"} online now</p>}
       {q.isPending ? <Skeleton /> : q.isError ? <ErrorBox error={q.error} retry={() => q.refetch()} /> : (
         <>
           <div className="overflow-x-auto rounded-xl border"><table className="w-full text-sm">
             <thead className="bg-secondary/50 text-left text-xs text-muted-foreground"><tr><th className="p-3">Email</th><th className="p-3">Role</th><th className="p-3">Status</th><th className="p-3">Joined</th><th className="p-3">Last sign-in</th><th className="p-3 text-right">Actions</th></tr></thead>
             <tbody>
-              {q.data.users.length === 0 && <tr><td colSpan={6} className="p-6 text-center text-muted-foreground">No accounts found.</td></tr>}
-              {q.data.users.map((u) => (
+              {arr(q.data.users).length === 0 && <tr><td colSpan={6} className="p-6 text-center text-muted-foreground">No accounts found.</td></tr>}
+              {arr<NonNullable<typeof q.data>["users"][number]>(q.data.users).map((u) => (
                 <tr key={u.uid} className="border-t">
                   <td className="p-3">{u.email ?? <span className="text-muted-foreground">—</span>}</td>
                   <td className="p-3"><span className={`rounded px-1.5 py-0.5 text-xs ${u.role === "owner" ? "bg-primary text-primary-foreground" : "bg-secondary"}`}>{u.role}</span></td>
@@ -243,7 +246,7 @@ function UsersPanel() {
           {!email && (
             <div className="flex justify-between">
               <button disabled={pages.length < 2} onClick={() => setPages((p) => p.slice(0, -1))} className="rounded-lg border px-3 py-1.5 text-sm disabled:opacity-40">Previous</button>
-              <button disabled={!q.data.next} onClick={() => setPages((p) => [...p, q.data.next!])} className="rounded-lg border px-3 py-1.5 text-sm disabled:opacity-40">Next</button>
+              <button disabled={!q.data?.next} onClick={() => setPages((p) => [...p, q.data.next!])} className="rounded-lg border px-3 py-1.5 text-sm disabled:opacity-40">Next</button>
             </div>
           )}
         </>
@@ -320,8 +323,8 @@ function MediaPanel() {
       <p className="text-sm text-muted-foreground">Files in your Cloudflare R2 bucket.</p>
       <input value={filter} onChange={(e) => setFilter(e.target.value)} placeholder="Filter this page by name" aria-label="Filter files" className="h-10 w-full rounded-lg border bg-background px-3 text-sm" />
       {(() => {
-        const shown = q.data.items.filter((i) => i.key.toLowerCase().includes(filter.toLowerCase()));
-        const base = (q.data.publicUrl ?? "").replace(/\/$/, "");
+        const shown = arr<{ key: string; size: number }>(q.data?.items).filter((i) => String(i?.key ?? "").toLowerCase().includes(filter.toLowerCase()));
+        const base = (q.data?.publicUrl ?? "").replace(/\/$/, "");
         if (!shown.length) return <p className="rounded-xl border p-6 text-center text-sm text-muted-foreground">No files.</p>;
         const deletable = shown.filter((i) => i.key.startsWith("media/")).map((i) => i.key);
         return (<>
@@ -355,7 +358,7 @@ function MediaPanel() {
       })()}
       <div className="flex justify-between">
         <button disabled={cursors.length < 2} onClick={() => setCursors((c) => c.slice(0, -1))} className="rounded-lg border px-3 py-1.5 text-sm disabled:opacity-40">Previous</button>
-        <button disabled={!q.data.next} onClick={() => setCursors((c) => [...c, q.data.next!])} className="rounded-lg border px-3 py-1.5 text-sm disabled:opacity-40">Next</button>
+        <button disabled={!q.data?.next} onClick={() => setCursors((c) => [...c, q.data.next!])} className="rounded-lg border px-3 py-1.5 text-sm disabled:opacity-40">Next</button>
       </div>
       </>)}
     </div>
@@ -391,14 +394,15 @@ function SettingsPanel() {
   const q = useQuery({ queryKey: ["studio", "overview"], queryFn: () => call(studioOverview) });
   const [form, setForm] = useState<SiteSettingsT | null>(null);
   const [confirm, setConfirm] = useState(false);
-  useEffect(() => { if (q.data && !form) setForm(q.data.settings); }, [q.data]);
+  useEffect(() => { if (q.data && !form) setForm(safeSettings(q.data.settings)); }, [q.data]);
   const m = useMutation({
     mutationFn: () => call(studioSaveSettings, { settings: form }),
     onSuccess: () => { toast.success("Saved. Visitors see it on their next page load."); setConfirm(false); qc.invalidateQueries({ queryKey: ["studio"] }); },
     onError: (e) => toast.error(errMsg(e)),
   });
+  if (q.isError && !form) return <ErrorBox error={q.error} retry={() => q.refetch()} />;
   if (q.isPending || !form) return q.isError ? <ErrorBox error={q.error} retry={() => q.refetch()} /> : <Skeleton />;
-  const risky = form.maintenance !== q.data!.settings.maintenance;
+  const risky = form.maintenance !== safeSettings(q.data?.settings).maintenance;
   return (
     <div className="max-w-xl space-y-4">
       <Card title="Background work (runs about once a minute)">
@@ -426,7 +430,7 @@ function JobsPanel() {
   const m = useMutation({ mutationFn: () => call(studioJobs, { process: true }), onSuccess: () => { toast.success("Processed one batch"); q.refetch(); }, onError: (e) => toast.error(errMsg(e)) });
   if (q.isPending) return <Skeleton />;
   if (q.isError) return <ErrorBox error={q.error} retry={() => q.refetch()} />;
-  const s = q.data.stats;
+  const s = q.data?.stats ?? null;
   return (
     <div className="space-y-4">
       <div className="grid gap-3 sm:grid-cols-3">
@@ -448,18 +452,18 @@ function HealthPanel() {
   if (q.isError) return <ErrorBox error={q.error} retry={() => q.refetch()} />;
   return (
     <div className="space-y-3">
-      <div className="flex items-center justify-between text-xs text-muted-foreground"><span>Checked {new Date(q.data.at).toLocaleTimeString()} — live test calls from the server</span><button onClick={() => q.refetch()} className="rounded border px-2 py-1">{q.isFetching ? "Checking…" : "Check again"}</button></div>
+      <div className="flex items-center justify-between text-xs text-muted-foreground"><span>Checked {q.data?.at ? new Date(q.data.at).toLocaleTimeString() : "—"} — live test calls from the server</span><button onClick={() => q.refetch()} className="rounded border px-2 py-1">{q.isFetching ? "Checking…" : "Check again"}</button></div>
       <div className="grid gap-3 sm:grid-cols-2">
-        {q.data.checks.map((c) => (
+        {arr<NonNullable<typeof q.data>["checks"][number]>(q.data?.checks).map((c) => (
           <div key={c.name} className="flex items-start gap-3 rounded-xl border bg-card p-4">
             {c.status === "ok" ? <Activity className="mt-0.5 h-4 w-4" /> : c.status === "down" ? <ShieldAlert className="mt-0.5 h-4 w-4 text-destructive" /> : <Settings className="mt-0.5 h-4 w-4 text-muted-foreground" />}
             <div className="min-w-0">
               <div className="font-semibold">{c.name}</div>
               <div className={`text-sm ${c.status === "down" ? "text-destructive" : "text-muted-foreground"}`}>{c.status === "ok" ? `Working${c.ms != null ? ` · ${c.ms} ms` : ""}` : c.status === "down" ? "Not responding" : "Not configured"}</div>
               {c.note && <div className="mt-1 break-words text-xs text-muted-foreground">{c.note}</div>}
-              {c.keys.length > 0 && (
+              {arr(c.keys).length > 0 && (
                 <ul className="mt-2 space-y-0.5">
-                  {c.keys.map((k) => (
+                  {arr<{ name: string; set: boolean; required: boolean }>(c.keys).map((k) => (
                     <li key={k.name} className="flex items-center gap-2 text-[11px]">
                       <span className={`inline-block h-2 w-2 shrink-0 rounded-full ${k.set ? "bg-primary" : k.required ? "bg-destructive" : "bg-muted-foreground/40"}`} />
                       <code className="truncate">{k.name}</code>
@@ -486,10 +490,10 @@ function AuditPanel() {
   return (
     <div className="space-y-3">
       <p className="text-sm text-muted-foreground">Written only by the server. Includes denied Studio attempts. Keeps the latest 5,000 entries.</p>
-      <div className="rounded-xl border p-3"><AuditTable entries={q.data.entries} /></div>
+      <div className="rounded-xl border p-3"><AuditTable entries={arr(q.data?.entries)} /></div>
       <div className="flex justify-between">
         <button disabled={page === 0} onClick={() => setPage((p) => p - 1)} className="rounded-lg border px-3 py-1.5 text-sm disabled:opacity-40">Newer</button>
-        <button disabled={q.data.entries.length < 50} onClick={() => setPage((p) => p + 1)} className="rounded-lg border px-3 py-1.5 text-sm disabled:opacity-40">Older</button>
+        <button disabled={arr(q.data?.entries).length < 50} onClick={() => setPage((p) => p + 1)} className="rounded-lg border px-3 py-1.5 text-sm disabled:opacity-40">Older</button>
       </div>
     </div>
   );

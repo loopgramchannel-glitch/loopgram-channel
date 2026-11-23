@@ -4,8 +4,10 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { ArrowDown, ArrowUp, Loader2, Search, Star, Trophy, X } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
+import { safeSettings } from "@/lib/studio-safe";
 import { studioOverview, studioSaveSettings, type SiteSettingsT } from "@/lib/studio.functions";
 import { postsQuery } from "@/lib/posts-query";
+import { asPostList } from "@/lib/safe-data";
 import { PostThumb } from "@/components/PostView";
 import { niceTitle } from "@/lib/discover";
 import type { PostT } from "@/lib/posts";
@@ -26,14 +28,14 @@ export function ShowcasePanel() {
   const posts = useQuery(postsQuery);
   const [f, setF] = useState<SiteSettingsT | null>(null);
   const [find, setFind] = useState("");
-  useEffect(() => { if (q.data && !f) setF(q.data.settings as SiteSettingsT); }, [q.data]);
+  useEffect(() => { if (q.data && !f) setF(safeSettings(q.data.settings)); }, [q.data]);
   const m = useMutation({
     mutationFn: async () => studioSaveSettings({ data: { token: await tok(), settings: f! } }),
     onSuccess: () => { toast.success("Saved. Visitors see it on their next page load."); qc.invalidateQueries({ queryKey: ["studio"] }); },
     onError: (e) => toast.error(e instanceof Error ? e.message.replace(/^\d{3}:\s*/, "") : "Could not save"),
   });
   if (!f || !posts.data) return <p className="text-sm text-muted-foreground">{q.isError || posts.isError ? "Could not load." : "Loading…"}</p>;
-  const all = posts.data;
+  const all = asPostList(posts.data);
   const byId = new Map(all.map((p) => [p.id, p]));
   const hero = f.heroId ? byId.get(f.heroId) : undefined;
   const top = f.topIds.map((id) => byId.get(id)).filter((p): p is PostT => !!p);

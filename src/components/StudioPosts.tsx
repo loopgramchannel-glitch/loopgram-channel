@@ -15,6 +15,7 @@ import { DownloadButton, keyFromUrl } from "@/components/DownloadButton";
 import { parseVideoSource, POST_CATEGORIES } from "@/lib/video-source";
 import { linkTitle } from "@/lib/link-title.functions";
 import { timeAgo } from "@/lib/posts-query";
+import { asPostList } from "@/lib/safe-data";
 import { studioImportTikTok } from "@/lib/tiktok-import.functions";
 import { isTikTokUrl, youTubeId } from "@/lib/tiktok";
 import { studioImportYouTube } from "@/lib/youtube-import.functions";
@@ -70,7 +71,7 @@ export function PostsPanel() {
   const tick = (p: PostT) => selecting && (
     <span className="absolute right-1.5 top-1.5 rounded bg-background/90 p-0.5">{sel.has(p.id) ? <CheckSquare className="h-5 w-5 text-primary" /> : <Square className="h-5 w-5" />}</span>
   );
-  const list = q.data ?? [];
+  const list = asPostList(q.data);
   const ratios = useRatios(list.map((p) => p.videoUrl));
   const live = list.filter((p) => p.published).length;
   return (

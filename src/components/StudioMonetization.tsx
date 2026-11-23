@@ -4,6 +4,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { Loader2 } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
+import { safeSettings } from "@/lib/studio-safe";
 import { studioMoney, studioOverview, studioSaveSettings, type SiteSettingsT } from "@/lib/studio.functions";
 import { ADSENSE_CLIENT, AD_KINDS, AD_SLOTS, AD_UNIT_NAMES } from "@/lib/ads";
 
@@ -17,7 +18,7 @@ export function MonetizationPanel() {
   const tok = async () => { const t = await getToken(); if (!t) throw new Error("Signed out"); return t; };
   const q = useQuery({ queryKey: ["studio", "overview"], queryFn: async () => studioOverview({ data: { token: await tok() } }) });
   const [f, setF] = useState<SiteSettingsT | null>(null);
-  useEffect(() => { if (q.data && !f) setF(q.data.settings as SiteSettingsT); }, [q.data]);
+  useEffect(() => { if (q.data && !f) setF(safeSettings(q.data.settings)); }, [q.data]);
   const m = useMutation({
     mutationFn: async () => studioSaveSettings({ data: { token: await tok(), settings: f! } }),
     onSuccess: () => { toast.success("Saved. Visitors see it on their next page load."); qc.invalidateQueries({ queryKey: ["studio"] }); },
